@@ -1,9 +1,10 @@
 use crate::config::Config;
+use db::db::DatabaseManager;
 
 impl Default for Config {
     fn default() -> Self {
         Self {
-            database_url: "sqlite:///pendora.db".to_string(),
+            database: DatabaseManager::new(),
             osu_client_id: "".to_string(),
             osu_client_secret: "".to_string(),
             discord_bot_token: "".to_string(),

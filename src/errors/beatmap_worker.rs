@@ -9,4 +9,8 @@ pub enum BeatmapWorkerError {
     #[error("Beatmap processing failed: {0}")]
     #[allow(dead_code)]
     ProcessingFailed(String),
+
+    #[error("Minacalc error: {0}")]
+    #[allow(dead_code)]
+    MinacalcError(String),
 }

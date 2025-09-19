@@ -1,13 +1,12 @@
 use anyhow::Result;
 use rosu_v2::prelude::*;
-
 pub struct OsuApiService {
     client: Osu,
 }
 
 impl OsuApiService {
-    pub async fn new(client_id: u64, client_secret: String) -> Result<Self> {
-        let client = Osu::new(client_id, client_secret).await?;
+    pub async fn new(client_id: String, client_secret: String) -> Result<Self> {
+        let client = Osu::new(client_id.parse::<u64>().unwrap(), client_secret).await?;
 
         Ok(Self { client })
     }

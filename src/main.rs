@@ -1,10 +1,14 @@
 mod api;
 mod beatmap_worker;
 mod config;
+mod convert;
 mod errors;
+mod utils;
+
+use api::osu::OsuApiService;
 use config::Config;
 use tracing_appender::rolling::{RollingFileAppender, Rotation};
-use tracing_subscriber::{EnvFilter, fmt, layer::SubscriberExt};
+use tracing_subscriber::{fmt, layer::SubscriberExt, EnvFilter};
 
 fn init_logging() -> tracing_appender::non_blocking::WorkerGuard {
     // Create logs directory if it doesn't exist
@@ -30,7 +34,7 @@ async fn main() {
     let _guard = init_logging();
 
     // Load configuration
-    let config = match Config::load() {
+    let config = match Config::load().await {
         Ok(config) => config,
         Err(e) => {
             tracing::error!("Error while loading config: {}", e);
@@ -38,10 +42,16 @@ async fn main() {
         }
     };
 
+    let osu_api_service = OsuApiService::new(
+        config.osu_client_id.clone(),
+        config.osu_client_secret.clone(),
+    )
+    .await
+    .unwrap();
     tracing::info!("Application started successfully");
 
     tokio::select! {
-        result = beatmap_worker::start(&config) => {
+        result = beatmap_worker::start(&config, osu_api_service) => {
             tracing::info!("BeatmapWorker finished: {:?}", result);
         }
     }

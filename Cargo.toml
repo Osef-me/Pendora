@@ -1,11 +1,11 @@
 [package]
-name = "Pendora"
+name = "pendora"
 version = "0.1.0"
-edition = "2024"
+edition = "2021"
 
 [dependencies]
 dotenvy = "0.15.7"
-minacalc-rs = "0.2.2"
+minacalc-rs = { version = "0.2.2", features = ["osu", "hashmap"] }
 rosu-map = "0.2.1"
 rosu-pp = "3.1.0"
 rosu-v2 = "0.11.0"
@@ -14,4 +14,9 @@ tokio = { version = "1.47.1", features = ["full"] }
 tracing = "0.1.41"
 tracing-subscriber = { version = "0.3.20", features = ["env-filter"] }
 tracing-appender = "0.2.3"
-
+anyhow = "1.0.100"
+dto = { path = "../dto" }
+db = { path = "../db" }
+bigdecimal = { version = "0.4.8", features = ["serde"] }
+serde_json.workspace = true
+reqwest = "0.12.23"
