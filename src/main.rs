@@ -51,7 +51,7 @@ async fn main() {
     tracing::info!("Application started successfully");
 
     tokio::select! {
-        result = beatmap_worker::start(&config, osu_api_service) => {
+        result = beatmap_worker::start(&config, osu_api_service, "6dd2938dfb35fc68465974a431096d89".to_string()) => {
             tracing::info!("BeatmapWorker finished: {:?}", result);
         }
     }

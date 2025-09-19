@@ -1,3 +1,4 @@
+pub mod rate;
 use anyhow::Result;
 use reqwest;
 use rosu_v2::prelude::GameMode;
@@ -36,5 +37,3 @@ pub async fn is_allowed_beatmap(mode: GameMode, cs: f32) -> bool {
 
     true
 }
-
-
