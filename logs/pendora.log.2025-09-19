@@ -1,0 +1,7 @@
+2025-09-19T14:23:47.926894Z  INFO Pendora: Application started successfully
+2025-09-19T14:23:47.926943Z  INFO Pendora::beatmap_worker: Beatmap worker started
+2025-09-19T14:23:47.926961Z  INFO Pendora: BeatmapWorker finished: Ok(())
+2025-09-19T14:23:58.492931Z ERROR Pendora: Error while loading config: Missing required environment variable: DATABASE_URL
+2025-09-19T14:24:07.371638Z  INFO Pendora: Application started successfully
+2025-09-19T14:24:07.371689Z  INFO Pendora::beatmap_worker: Beatmap worker started
+2025-09-19T14:24:07.371706Z  INFO Pendora: BeatmapWorker finished: Ok(())
