@@ -1,13 +1,16 @@
 use minacalc_rs::{hashmap::HashMapCalcExt, osu::OsuCalcExt, Calc, Ssr};
 use rosu_map::Beatmap as RmBeatmap;
 use rosu_v2::prelude::BeatmapExtended;
-use crate::convert::beatmap::Beatmap;
+use crate::core::beatmap::types::Beatmap;
 use std::str::FromStr;
 use crate::utils::osu_file_from_url;
-use crate::convert::Rates;
+use crate::core::rating::types::Rates;
 use crate::errors::BeatmapWorkerError;
 use crate::utils::rate::beatmap_processor::BeatmapProcessor;
 use std::collections::HashMap;
+use crate::core::rating::make_rates::RatesMaker;
+use crate::utils::calculator::get_quaver_rating;
+use crate::utils::calculator::get_sunnyxxy_rating;
 
 /// Structure unifiée contenant à la fois le beatmap et les scores de skillset
 #[derive(Debug, Clone)]
@@ -55,13 +58,19 @@ pub(crate) async fn process_beatmap(
 
     // Traiter chaque entrée unifiée
     for (rate_key, beatmap_with_scores) in beatmaps_with_scores {
+        let rates_maker = RatesMaker {
+            skillset_scores: beatmap_with_scores.skillset_scores,
+            osu_map: &osu_map,
+            rate: rate_key,
+            drain_time: beatmap.seconds_drain as f64,
+            total_time: beatmap.seconds_total as f64,
+            bpm: beatmap.bpm as f32,
+            osu_rating: beatmap.stars as f64,
+            quaver_rating: get_quaver_rating(&osu_map),
+            sunnyxxy_rating: get_sunnyxxy_rating(&osu_map)
+        };
         let rates: Rates = Rates::from_skillset_scores(
-            beatmap_with_scores.skillset_scores, 
-            &osu_map, 
-            rate_key, 
-            beatmap.seconds_drain as f64, 
-            beatmap.seconds_total as f64, 
-            beatmap.bpm as f32
+            rates_maker
         )
         .await
         .unwrap();
