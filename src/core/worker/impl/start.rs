@@ -1,5 +1,6 @@
 use crate::core::beatmap::from::beatmap_from_beatmap_extended;
 use crate::core::beatmapset::from::beatmapset_from_beatmapset_extended;
+use crate::core::worker::r#impl::insert::insert_full_beatmapset;
 use crate::core::worker::process::process_beatmap;
 use crate::core::worker::types::BeatmapWorker;
 use crate::errors::BeatmapWorkerError;
@@ -35,6 +36,7 @@ impl BeatmapWorker {
                 .unwrap();
 
             beatmapset_row.beatmaps.push(beatmap_row);
+            insert_full_beatmapset(&self, &beatmapset_row).await.unwrap();
             match serde_json::to_string_pretty(&beatmapset_row) {
                 Ok(json) => println!("{}", json),
                 Err(e) => eprintln!("Failed to serialize beatmapset_row to JSON: {}", e),

@@ -9,7 +9,7 @@ use anyhow::Result;
 pub async fn rates_from_skillset_scores(make_rates: &mut RatesMaker) -> Result<Rates> {
         let rate = make_rates.rate.parse::<f64>().unwrap();
         let centirate = rate * 100.0;
-        let proportion_rate = centirate / 100.0;
+        let proportion_rate =  100.0 / centirate;
         let drain_time = make_rates.drain_time * proportion_rate;
         let total_time = make_rates.total_time * proportion_rate;
         let bpm = make_rates.bpm as f64 * rate;
@@ -28,10 +28,12 @@ pub async fn rates_from_skillset_scores(make_rates: &mut RatesMaker) -> Result<R
         let stars = get_star_rating(&osu_map);
         // For etterna rating, we use direct values from Ssr
         let etterna_rating = Rating {
+            id: None,
             rates_id: None,
             rating: make_rates.skillset_scores.overall as f64,
             rating_type: "etterna".to_string(),
             mode_rating: ModeRating::Mania(ManiaRating {
+                id: None,
                 stream: make_rates.skillset_scores.stream as f64,
                 jumpstream: make_rates.skillset_scores.jumpstream as f64,
                 handstream: make_rates.skillset_scores.handstream as f64,
@@ -55,7 +57,9 @@ pub async fn rates_from_skillset_scores(make_rates: &mut RatesMaker) -> Result<R
 
         let sunny_rating = rating_new("sunnyxxy".to_string(), get_sunnyxxy_rating(&osu_map), osu_proportion.clone());
         let osu_rating = rating_new("osu".to_string(), stars, osu_proportion);
+
         let rates = Rates {
+            id: None,
             osu_hash: Some(osu_hash),
             centirate: centirate as i32,
             drain_time: drain_time as i32,
@@ -72,10 +76,12 @@ pub async fn rates_from_skillset_scores(make_rates: &mut RatesMaker) -> Result<R
 
 pub fn rating_new(rating_type: String, rating: f64, proportion: Proportion) -> Rating {
         Rating {
+            id: None,
             rates_id: None,
             rating,
             rating_type,
             mode_rating: ModeRating::Mania(ManiaRating {
+                id: None,
                 stream: rating * proportion.stream,
                 jumpstream: rating * proportion.jumpstream,
                 handstream: rating * proportion.handstream,

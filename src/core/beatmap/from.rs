@@ -5,6 +5,7 @@ use rosu_v2::prelude::BeatmapExtended;
 
 pub fn beatmap_from_beatmap_extended(b: &BeatmapExtended) -> Beatmap {
         Beatmap {
+            id: None,
             osu_id: Some(b.map_id.clone() as i32),
             beatmapset_id: None,
             difficulty: b.version.clone(),

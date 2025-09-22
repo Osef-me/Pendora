@@ -4,6 +4,7 @@ use rosu_v2::prelude::BeatmapsetExtended;
 
 pub fn beatmapset_from_beatmapset_extended(beatmapset: &BeatmapsetExtended) -> Beatmapset {
         Beatmapset {
+            id: None,
             osu_id: Some(beatmapset.mapset_id as i32),
             artist: beatmapset.artist.clone(),
             artist_unicode: Some(
