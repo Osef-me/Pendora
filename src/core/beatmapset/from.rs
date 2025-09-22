@@ -1,8 +1,8 @@
-use super::types::Beatmapset;
+use dto::models::beatmaps::full::types::Beatmapset;
 use rosu_v2::prelude::BeatmapsetExtended;
 
-impl Beatmapset {
-    pub fn from_beatmapset_extended(beatmapset: &BeatmapsetExtended) -> Beatmapset {
+
+pub fn beatmapset_from_beatmapset_extended(beatmapset: &BeatmapsetExtended) -> Beatmapset {
         Beatmapset {
             osu_id: Some(beatmapset.mapset_id as i32),
             artist: beatmapset.artist.clone(),
@@ -31,5 +31,5 @@ impl Beatmapset {
             osu_file_url: Some(beatmapset.source.to_string()),
             beatmaps: Vec::new(),
         }
-    }
 }
+

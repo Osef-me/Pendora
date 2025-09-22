@@ -1,12 +1,12 @@
 use crate::core::rating::make_rates::RatesMaker;
 use crate::core::rating::proportion::Proportion;
-use crate::core::rating::types::{ManiaRating, Rates, Rating};
+use dto::models::beatmaps::full::types::{ManiaRating, ModeRating, Rates, Rating};
 use crate::utils::calculator::get_star_rating;
 use crate::utils::rate::hash::hash_md5;
+use crate::utils::calculator::get_sunnyxxy_rating;
 use anyhow::Result;
 
-impl Rates {
-    pub async fn from_skillset_scores(make_rates: &mut RatesMaker) -> Result<Rates> {
+pub async fn rates_from_skillset_scores(make_rates: &mut RatesMaker) -> Result<Rates> {
         let rate = make_rates.rate.parse::<f64>().unwrap();
         let centirate = rate * 100.0;
         let proportion_rate = centirate / 100.0;
@@ -31,7 +31,7 @@ impl Rates {
             rates_id: None,
             rating: make_rates.skillset_scores.overall as f64,
             rating_type: "etterna".to_string(),
-            mania_rating: ManiaRating {
+            mode_rating: ModeRating::Mania(ManiaRating {
                 stream: make_rates.skillset_scores.stream as f64,
                 jumpstream: make_rates.skillset_scores.jumpstream as f64,
                 handstream: make_rates.skillset_scores.handstream as f64,
@@ -39,7 +39,7 @@ impl Rates {
                 jackspeed: make_rates.skillset_scores.jackspeed as f64,
                 chordjack: make_rates.skillset_scores.chordjack as f64,
                 technical: make_rates.skillset_scores.technical as f64,
-            },
+            }),
         };
 
         // Create proportion for osu rating (calculated proportions)
@@ -53,6 +53,8 @@ impl Rates {
             technical: technical_proportion,
         };
 
+        let sunny_rating = rating_new("sunnyxxy".to_string(), get_sunnyxxy_rating(&osu_map), osu_proportion.clone());
+        let osu_rating = rating_new("osu".to_string(), stars, osu_proportion);
         let rates = Rates {
             osu_hash: Some(osu_hash),
             centirate: centirate as i32,
@@ -61,20 +63,19 @@ impl Rates {
             bpm: bpm as f32,
             rating: vec![
                 etterna_rating,
-                Rating::new("osu".to_string(), stars, osu_proportion),
+                sunny_rating,
+                osu_rating,
             ],
         };
         Ok(rates)
     }
-}
 
-impl Rating {
-    pub fn new(rating_type: String, rating: f64, proportion: Proportion) -> Rating {
+pub fn rating_new(rating_type: String, rating: f64, proportion: Proportion) -> Rating {
         Rating {
             rates_id: None,
             rating,
             rating_type,
-            mania_rating: ManiaRating {
+            mode_rating: ModeRating::Mania(ManiaRating {
                 stream: rating * proportion.stream,
                 jumpstream: rating * proportion.jumpstream,
                 handstream: rating * proportion.handstream,
@@ -82,7 +83,6 @@ impl Rating {
                 jackspeed: rating * proportion.jackspeed,
                 chordjack: rating * proportion.chordjack,
                 technical: rating * proportion.technical,
-            },
+            }),
         }
     }
-}

@@ -1,9 +1,9 @@
-use crate::core::beatmap::types::Beatmap;
+use dto::models::beatmaps::full::types::Beatmap;
 use crate::utils::rank_status_to_string;
 use rosu_v2::prelude::BeatmapExtended;
 
-impl Beatmap {
-    pub fn from_beatmap_extended(b: &BeatmapExtended) -> Beatmap {
+
+pub fn beatmap_from_beatmap_extended(b: &BeatmapExtended) -> Beatmap {
         Beatmap {
             osu_id: Some(b.map_id.clone() as i32),
             beatmapset_id: None,
@@ -21,5 +21,5 @@ impl Beatmap {
             main_pattern: serde_json::to_value("[]").unwrap(),
             rates: Vec::new(),
         }
-    }
 }
+

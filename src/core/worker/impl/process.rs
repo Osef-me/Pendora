@@ -1,6 +1,7 @@
-use crate::core::beatmap::types::Beatmap;
+use dto::models::beatmaps::full::types::Beatmap;
+use crate::core::rating::from::rates_from_skillset_scores;
 use crate::core::rating::make_rates::RatesMaker;
-use crate::core::rating::types::Rates;
+use dto::models::beatmaps::full::types::Rates;
 use crate::errors::BeatmapWorkerError;
 use crate::utils::osu_file_from_url;
 use crate::utils::rate::beatmap_processor::BeatmapProcessor;
@@ -75,10 +76,10 @@ pub(crate) async fn process_beatmap(
             total_time: beatmap.seconds_total as f64,
             bpm: beatmap.bpm as f32,
         };
-        let rates: Rates = Rates::from_skillset_scores(&mut rates_maker).await.unwrap();
+        let rates: Rates = rates_from_skillset_scores(&mut rates_maker).await.unwrap();
 
         // Sauvegarder le beatmap compressé en Brotli, nommé par le hash calculé
-        if let (Some(osu_id), Some(ref hash)) = (beatmap_row.osu_id, &rates.osu_hash) {
+        if let (Some(osu_id), Some(hash)) = (beatmap_row.osu_id, &rates.osu_hash) {
             // S'assurer que l'arborescence existe
             let _ = FileManager::create_beatmap_directory_structure(osu_id);
 

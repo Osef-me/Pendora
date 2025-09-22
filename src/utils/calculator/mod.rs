@@ -1,11 +1,16 @@
 use std::str::FromStr;
-
+use ssrrr::preprocess;
+use ssrrr::algorithm::process::process::calculate;
 pub fn get_quaver_rating(osu_map: &str) -> f64 {
     0.0
 }
 
 pub fn get_sunnyxxy_rating(osu_map: &str) -> f64 {
-    0.0
+
+    let preprocess = preprocess(osu_map, "None").unwrap();
+    let b = calculate(&preprocess).unwrap();
+    println!("{:?}", b);
+    b.rating
 }
 
 pub fn get_star_rating(osu_map: &str) -> f64 {

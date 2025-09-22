@@ -1,5 +1,5 @@
-use crate::core::beatmap::types::Beatmap;
-use crate::core::beatmapset::types::Beatmapset;
+use crate::core::beatmap::from::beatmap_from_beatmap_extended;
+use crate::core::beatmapset::from::beatmapset_from_beatmapset_extended;
 use crate::core::worker::process::process_beatmap;
 use crate::core::worker::types::BeatmapWorker;
 use crate::errors::BeatmapWorkerError;
@@ -25,8 +25,8 @@ impl BeatmapWorker {
             }
 
             let beatmapset = beatmap.mapset.clone().unwrap();
-            let mut beatmapset_row = Beatmapset::from_beatmapset_extended(&beatmapset);
-            let mut beatmap_row = Beatmap::from_beatmap_extended(&beatmap);
+            let mut beatmapset_row = beatmapset_from_beatmapset_extended(&beatmapset);
+            let mut beatmap_row = beatmap_from_beatmap_extended(&beatmap);
             let osu_path = build_file_path(beatmap_row.osu_id.clone().unwrap() as u32);
 
             // TODO: Implement process_beatmap function
@@ -36,7 +36,7 @@ impl BeatmapWorker {
 
             beatmapset_row.beatmaps.push(beatmap_row);
             match serde_json::to_string_pretty(&beatmapset_row) {
-                Ok(json) => println!("done"),
+                Ok(json) => println!("{}", json),
                 Err(e) => eprintln!("Failed to serialize beatmapset_row to JSON: {}", e),
             }
             break;
