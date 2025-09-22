@@ -1,5 +1,5 @@
-    pub mod rate;
 pub mod calculator;
+pub mod rate;
 use anyhow::Result;
 use reqwest;
 use rosu_v2::prelude::GameMode;

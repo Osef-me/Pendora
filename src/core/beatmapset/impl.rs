@@ -1,5 +1,5 @@
-use rosu_v2::prelude::BeatmapsetExtended;
 use super::types::Beatmapset;
+use rosu_v2::prelude::BeatmapsetExtended;
 
 impl Beatmapset {
     pub fn from_beatmapset_extended(beatmapset: &BeatmapsetExtended) -> Beatmapset {

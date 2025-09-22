@@ -1,5 +1,5 @@
-use rosu_map::Beatmap;
 use rosu_map::section::hit_objects::{HitObject, HitObjectKind};
+use rosu_map::Beatmap;
 
 /// Traite les beatmaps en appliquant des modifications de rate
 pub struct BeatmapProcessor;
@@ -8,8 +8,10 @@ impl BeatmapProcessor {
     /// Applique un rate sur un beatmap
     pub fn apply_rate(rate: f64, map: &mut Beatmap) {
         // Modifie le nom du fichier audio
-        map.audio_file = map.audio_file.replace(".mp3", format!("_r{}.ogg", rate).as_str());
-        
+        map.audio_file = map
+            .audio_file
+            .replace(".mp3", format!("_r{}.ogg", rate).as_str());
+
         let time_multiplier: f64 = 1.0 / rate;
 
         // Applique le multiplicateur de temps à tous les hit objects
@@ -45,7 +47,7 @@ impl BeatmapProcessor {
     /// Ajuste le timing d'un hit object selon le multiplicateur
     fn adjust_hit_object_timing(hit_object: &mut HitObject, time_multiplier: f64) {
         hit_object.start_time *= time_multiplier;
-        
+
         if let HitObjectKind::Hold(hold) = &mut hit_object.kind {
             hold.duration *= time_multiplier;
         }

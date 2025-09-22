@@ -1,6 +1,6 @@
-use rosu_v2::prelude::BeatmapExtended;
 use crate::core::beatmap::types::Beatmap;
 use crate::utils::rank_status_to_string;
+use rosu_v2::prelude::BeatmapExtended;
 
 impl Beatmap {
     pub fn from_beatmap_extended(b: &BeatmapExtended) -> Beatmap {

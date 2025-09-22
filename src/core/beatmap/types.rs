@@ -1,6 +1,6 @@
 use crate::core::rating::types::Rates;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize)]
 pub struct Beatmap {
     pub osu_id: Option<i32>,
     pub beatmapset_id: Option<i32>,

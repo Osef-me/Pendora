@@ -1,6 +1,4 @@
-use super::proportion::Proportion;
-
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize)]
 pub struct Rates {
     pub osu_hash: Option<String>,
     pub centirate: i32,
@@ -10,7 +8,7 @@ pub struct Rates {
     pub rating: Vec<Rating>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize)]
 pub struct Rating {
     pub rates_id: Option<i32>,
     pub rating: f64,
@@ -18,7 +16,7 @@ pub struct Rating {
     pub mania_rating: ManiaRating,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize)]
 pub struct ManiaRating {
     pub stream: f64,
     pub jumpstream: f64,

@@ -42,12 +42,12 @@ impl CompressionManager {
         let original_size = data.len();
         let mut compressed_data = Vec::new();
         let params = BrotliEncoderParams::default();
-        
+
         brotli::enc::BrotliCompress(&mut data.clone(), &mut compressed_data, &params)
             .map_err(|e| format!("Brotli compression failed: {}", e))?;
-        
+
         let compressed_size = compressed_data.len();
-        
+
         Ok(CompressionResult {
             compressed_data,
             original_size,

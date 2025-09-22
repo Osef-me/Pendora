@@ -1,6 +1,6 @@
 use crate::core::beatmap::types::Beatmap;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize)]
 pub struct Beatmapset {
     pub osu_id: Option<i32>,
     pub artist: String,

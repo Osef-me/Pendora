@@ -1,7 +1,6 @@
 mod api;
-mod beatmap_worker;
 mod config;
-mod convert;
+mod core;
 mod errors;
 mod utils;
 
@@ -50,8 +49,12 @@ async fn main() {
     .unwrap();
     tracing::info!("Application started successfully");
 
+    let beatmap_worker = core::worker::BeatmapWorker {
+        config,
+        osu_api_service,
+    };
     tokio::select! {
-        result = beatmap_worker::start(&config, osu_api_service, "6dd2938dfb35fc68465974a431096d89".to_string()) => {
+        result = beatmap_worker.start("6dd2938dfb35fc68465974a431096d89".to_string()) => {
             tracing::info!("BeatmapWorker finished: {:?}", result);
         }
     }

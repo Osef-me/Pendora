@@ -7,7 +7,9 @@ pub struct FileManager;
 
 impl FileManager {
     /// Crée la structure de dossiers nécessaire pour un beatmap
-    pub fn create_beatmap_directory_structure(beatmap_id: i32) -> Result<(), Box<dyn std::error::Error>> {
+    pub fn create_beatmap_directory_structure(
+        beatmap_id: i32,
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let paths = [
             "public",
             "public/beatmap",
