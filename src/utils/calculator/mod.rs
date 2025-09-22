@@ -6,10 +6,8 @@ pub fn get_quaver_rating(osu_map: &str) -> f64 {
 }
 
 pub fn get_sunnyxxy_rating(osu_map: &str) -> f64 {
-
     let preprocess = preprocess(osu_map, "None").unwrap();
     let b = calculate(&preprocess).unwrap();
-    println!("{:?}", b);
     b.rating
 }
 

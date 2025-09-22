@@ -13,4 +13,8 @@ pub enum BeatmapWorkerError {
     #[error("Minacalc error: {0}")]
     #[allow(dead_code)]
     MinacalcError(String),
+
+    #[error("Database error: {0}")]
+    #[allow(dead_code)]
+    DatabaseError(String),
 }
