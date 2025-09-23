@@ -7,12 +7,18 @@ use db::models::beatmaps::beatmapset::BeatmapsetRow;
 use db::models::beatmaps::rates::RatesRow;
 use db::models::rating::beatmap_mania_rating::BeatmapManiaRatingRow;
 use db::models::rating::beatmap_rating::BeatmapRatingRow;
-use dto::models::beatmaps::full::types::{Beatmap as DtoBeatmap, Beatmapset as DtoBeatmapset, ModeRating, Rates as DtoRates, Rating as DtoRating};
+use dto::models::beatmaps::full::types::{
+    Beatmap as DtoBeatmap, Beatmapset as DtoBeatmapset, ModeRating, Rates as DtoRates,
+    Rating as DtoRating,
+};
 
 /// Insert a full beatmapset hierarchy into the database using database-lib only.
 /// Order:
 /// - beatmapset -> beatmap(s) -> rates -> rating(s) -> mania rating(s)
-pub async fn insert_full_beatmapset(worker: &BeatmapWorker, dto: &DtoBeatmapset) -> Result<i32, BeatmapWorkerError> {
+pub async fn insert_full_beatmapset(
+    worker: &BeatmapWorker,
+    dto: &DtoBeatmapset,
+) -> Result<i32, BeatmapWorkerError> {
     let pool = worker.config.database.get_pool();
 
     // Insert beatmapset
@@ -27,10 +33,12 @@ pub async fn insert_full_beatmapset(worker: &BeatmapWorker, dto: &DtoBeatmapset)
         source: dto.source.clone(),
         // database expects Option<Vec<String>> while dto has Option<String>
         // minimal handling: split by space when provided
-        tags: dto
-            .tags
-            .as_ref()
-            .map(|s| s.split(' ').filter(|t| !t.is_empty()).map(|t| t.to_string()).collect()),
+        tags: dto.tags.as_ref().map(|s| {
+            s.split(' ')
+                .filter(|t| !t.is_empty())
+                .map(|t| t.to_string())
+                .collect()
+        }),
         has_video: dto.has_video,
         has_storyboard: dto.has_storyboard,
         is_explicit: dto.is_explicit,
@@ -106,13 +114,32 @@ pub async fn insert_full_beatmapset(worker: &BeatmapWorker, dto: &DtoBeatmapset)
                     let mania_row = BeatmapManiaRatingRow {
                         id: 0,
                         rating_id: Some(rating_id),
-                        stream: Some(BigDecimal::from_f64(mr.stream).unwrap_or_else(|| BigDecimal::from(0))),
-                        jumpstream: Some(BigDecimal::from_f64(mr.jumpstream).unwrap_or_else(|| BigDecimal::from(0))),
-                        handstream: Some(BigDecimal::from_f64(mr.handstream).unwrap_or_else(|| BigDecimal::from(0))),
-                        stamina: Some(BigDecimal::from_f64(mr.stamina).unwrap_or_else(|| BigDecimal::from(0))),
-                        jackspeed: Some(BigDecimal::from_f64(mr.jackspeed).unwrap_or_else(|| BigDecimal::from(0))),
-                        chordjack: Some(BigDecimal::from_f64(mr.chordjack).unwrap_or_else(|| BigDecimal::from(0))),
-                        technical: Some(BigDecimal::from_f64(mr.technical).unwrap_or_else(|| BigDecimal::from(0))),
+                        stream: Some(
+                            BigDecimal::from_f64(mr.stream).unwrap_or_else(|| BigDecimal::from(0)),
+                        ),
+                        jumpstream: Some(
+                            BigDecimal::from_f64(mr.jumpstream)
+                                .unwrap_or_else(|| BigDecimal::from(0)),
+                        ),
+                        handstream: Some(
+                            BigDecimal::from_f64(mr.handstream)
+                                .unwrap_or_else(|| BigDecimal::from(0)),
+                        ),
+                        stamina: Some(
+                            BigDecimal::from_f64(mr.stamina).unwrap_or_else(|| BigDecimal::from(0)),
+                        ),
+                        jackspeed: Some(
+                            BigDecimal::from_f64(mr.jackspeed)
+                                .unwrap_or_else(|| BigDecimal::from(0)),
+                        ),
+                        chordjack: Some(
+                            BigDecimal::from_f64(mr.chordjack)
+                                .unwrap_or_else(|| BigDecimal::from(0)),
+                        ),
+                        technical: Some(
+                            BigDecimal::from_f64(mr.technical)
+                                .unwrap_or_else(|| BigDecimal::from(0)),
+                        ),
                         created_at: None,
                         updated_at: None,
                     };

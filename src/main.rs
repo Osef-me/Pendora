@@ -19,14 +19,24 @@ fn init_logging() -> tracing_appender::non_blocking::WorkerGuard {
 
     // Console filter: only show info+ for pendora, dto, db modules
     let console_filter = EnvFilter::new("pendora=info,dto=info,db=info");
-    
+
     // File filter: show debug+ for pendora, dto, db modules
     let file_filter = EnvFilter::new("pendora=debug,dto=debug,db=debug");
 
     // Initialize tracing with separate console and file output
     let subscriber = tracing_subscriber::registry()
-        .with(fmt::layer().with_writer(std::io::stdout).with_ansi(true).with_filter(console_filter))
-        .with(fmt::layer().with_writer(non_blocking).with_ansi(false).with_filter(file_filter));
+        .with(
+            fmt::layer()
+                .with_writer(std::io::stdout)
+                .with_ansi(true)
+                .with_filter(console_filter),
+        )
+        .with(
+            fmt::layer()
+                .with_writer(non_blocking)
+                .with_ansi(false)
+                .with_filter(file_filter),
+        );
 
     tracing::subscriber::set_global_default(subscriber).expect("Setting default subscriber failed");
 

@@ -1,6 +1,6 @@
-use std::str::FromStr;
-use ssrrr::preprocess;
 use ssrrr::algorithm::process::process::calculate;
+use ssrrr::preprocess;
+use std::str::FromStr;
 
 pub fn get_quaver_rating(osu_map: &str) -> f64 {
     0.0
