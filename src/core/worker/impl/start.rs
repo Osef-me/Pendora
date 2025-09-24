@@ -33,19 +33,26 @@ impl BeatmapWorker {
                 pending_beatmap.id,
                 pending_beatmap.osu_hash
             );
-            PendingBeatmapRow::delete_by_id(&pool, pending_beatmap.id)
-                .await
-                .unwrap();
+            if let Err(e) = PendingBeatmapRow::delete_by_id(&pool, pending_beatmap.id).await {
+                tracing::error!(error = %e, "failed to delete pending beatmap");
+                continue;
+            }
 
             tracing::debug!(
                 "Fetching beatmap from osu! API for hash: {}",
                 pending_beatmap.osu_hash
             );
-            let beatmap = self
+            let beatmap = match self
                 .osu_api_service
                 .beatmap_by_checksum(pending_beatmap.osu_hash.clone())
                 .await
-                .unwrap();
+            {
+                Ok(b) => b,
+                Err(e) => {
+                    tracing::error!(error = %e, "failed to fetch beatmap by checksum");
+                    continue;
+                }
+            };
 
             tracing::debug!(
                 "Beatmap fetched: osu_id={}, mode={}, cs={}",
@@ -62,7 +69,10 @@ impl BeatmapWorker {
                 continue;
             }
 
-            let beatmapset = beatmap.mapset.clone().unwrap();
+            let Some(beatmapset) = beatmap.mapset.clone() else {
+                tracing::warn!("beatmap has no mapset, skipping");
+                continue;
+            };
             tracing::debug!(
                 "Beatmapset: id={}, artist={}, title={}",
                 beatmapset.mapset_id,
@@ -72,25 +82,31 @@ impl BeatmapWorker {
 
             let mut beatmapset_row = beatmapset_from_beatmapset_extended(&beatmapset);
             let mut beatmap_row = beatmap_from_beatmap_extended(&beatmap);
-            let osu_path = build_file_path(beatmap_row.osu_id.clone().unwrap() as u32);
+            let Some(osu_id) = beatmap_row.osu_id else {
+                tracing::warn!("beatmap has no osu_id, skipping");
+                continue;
+            };
+            let osu_path = build_file_path(osu_id as u32);
 
             tracing::info!(
                 "Processing beatmap: osu_id={}, difficulty={}",
                 beatmap_row.osu_id.unwrap(),
                 beatmap_row.difficulty
             );
-            process_beatmap(&beatmap, &calc, osu_path, &mut beatmap_row)
-                .await
-                .unwrap();
+            if let Err(e) = process_beatmap(&beatmap, &calc, osu_path, &mut beatmap_row).await {
+                tracing::warn!(error = %e, "failed to process beatmap (unsupported mode or other issue), skipping");
+                continue;
+            }
 
             beatmapset_row.beatmaps.push(beatmap_row);
             tracing::info!(
                 "Inserting beatmapset into database: osu_id={}",
                 beatmapset_row.osu_id.unwrap()
             );
-            insert_full_beatmapset(&self, &beatmapset_row)
-                .await
-                .unwrap();
+            if let Err(e) = insert_full_beatmapset(&self, &beatmapset_row).await {
+                tracing::error!(error = %e, "failed to insert beatmapset");
+                continue;
+            }
             tracing::info!(
                 "Successfully processed and inserted beatmapset: osu_id={}",
                 beatmapset_row.osu_id.unwrap()

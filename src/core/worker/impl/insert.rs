@@ -8,8 +8,7 @@ use db::models::beatmaps::rates::RatesRow;
 use db::models::rating::beatmap_mania_rating::BeatmapManiaRatingRow;
 use db::models::rating::beatmap_rating::BeatmapRatingRow;
 use dto::models::beatmaps::full::types::{
-    Beatmap as DtoBeatmap, Beatmapset as DtoBeatmapset, ModeRating, Rates as DtoRates,
-    Rating as DtoRating,
+    Beatmapset as DtoBeatmapset, ModeRating,
 };
 
 /// Insert a full beatmapset hierarchy into the database using database-lib only.
@@ -21,7 +20,7 @@ pub async fn insert_full_beatmapset(
 ) -> Result<i32, BeatmapWorkerError> {
     let pool = worker.config.database.get_pool();
 
-    // Insert beatmapset
+    // Insert beatmapset (ignore if duplicate by osu_id and reuse existing)
     let beatmapset_row = BeatmapsetRow {
         id: 0,
         osu_id: dto.osu_id,
@@ -50,9 +49,19 @@ pub async fn insert_full_beatmapset(
         updated_at: None,
     };
 
-    let beatmapset_id = BeatmapsetRow::insert(beatmapset_row, pool)
-        .await
-        .map_err(|e| BeatmapWorkerError::ProcessingFailed(e.to_string()))?;
+    let beatmapset_id = if let Some(osu_id) = beatmapset_row.osu_id {
+        match BeatmapsetRow::find_by_osu_id(pool, osu_id).await {
+            Ok(Some(existing)) => existing.id,
+            Ok(None) => BeatmapsetRow::insert(beatmapset_row, pool)
+                .await
+                .map_err(|e| BeatmapWorkerError::ProcessingFailed(e.to_string()))?,
+            Err(e) => return Err(BeatmapWorkerError::ProcessingFailed(e.to_string())),
+        }
+    } else {
+        BeatmapsetRow::insert(beatmapset_row, pool)
+            .await
+            .map_err(|e| BeatmapWorkerError::ProcessingFailed(e.to_string()))?
+    };
 
     // Insert each beatmap and its rates/ratings
     for dto_b in &dto.beatmaps {
@@ -76,9 +85,20 @@ pub async fn insert_full_beatmapset(
             updated_at: None,
         };
 
-        let beatmap_id = BeatmapRow::insert(beatmap_row, pool)
-            .await
-            .map_err(|e| BeatmapWorkerError::ProcessingFailed(e.to_string()))?;
+        // Insert beatmap (ignore if duplicate by osu_id and reuse existing)
+        let beatmap_id = if let Some(osu_id) = beatmap_row.osu_id {
+            match BeatmapRow::find_by_osu_id(pool, osu_id).await {
+                Ok(Some(existing)) => existing.id,
+                Ok(None) => BeatmapRow::insert(beatmap_row, pool)
+                    .await
+                    .map_err(|e| BeatmapWorkerError::ProcessingFailed(e.to_string()))?,
+                Err(e) => return Err(BeatmapWorkerError::ProcessingFailed(e.to_string())),
+            }
+        } else {
+            BeatmapRow::insert(beatmap_row, pool)
+                .await
+                .map_err(|e| BeatmapWorkerError::ProcessingFailed(e.to_string()))?
+        };
 
         for dto_r in &dto_b.rates {
             let rates_row = RatesRow {
