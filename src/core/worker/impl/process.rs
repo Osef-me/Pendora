@@ -7,7 +7,7 @@ use crate::utils::rate::beatmap_processor::BeatmapProcessor;
 use crate::utils::rate::compression::CompressionManager;
 use crate::utils::rate::file_manager::FileManager;
 use dto::models::beatmaps::full::types::Beatmap;
-use dto::models::beatmaps::full::types::Rates;
+use dto::models::rate::Rates;
 use minacalc_rs::{hashmap::HashMapCalcExt, osu::OsuCalcExt, Calc, Ssr};
 use rosu_map::Beatmap as RmBeatmap;
 use rosu_v2::prelude::BeatmapExtended;

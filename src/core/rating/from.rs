@@ -4,7 +4,7 @@ use crate::utils::calculator::get_star_rating;
 use crate::utils::calculator::get_sunnyxxy_rating;
 use crate::utils::rate::hash::hash_md5;
 use anyhow::Result;
-use dto::models::beatmaps::full::types::{ManiaRating, ModeRating, Rates, Rating};
+use dto::models::rate::{ManiaRating, ModeRating, Rates, Rating};
 use tracing::debug;
 
 pub async fn rates_from_skillset_scores(make_rates: &mut RatesMaker) -> Result<Rates> {
