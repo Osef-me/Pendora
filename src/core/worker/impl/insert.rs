@@ -46,6 +46,7 @@ pub async fn insert_full_beatmapset(
         cover_url: dto.cover_url.clone(),
         preview_url: dto.preview_url.clone(),
         osu_file_url: dto.osu_file_url.clone(),
+        osu_status_changed_at: dto.osu_status_changed_at.clone(),
         created_at: None,
         updated_at: None,
     };
