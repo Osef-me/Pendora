@@ -35,11 +35,27 @@ pub(crate) async fn process_beatmap(
     debug!("Starting beatmap processing for osu_id: {}", beatmap.map_id);
 
     debug!("Fetching osu file from URL: {}", osu_path);
-    let osu_map = osu_file_from_url(&osu_path).await.unwrap();
-    debug!("Osu file fetched, length: {} bytes", osu_map.len());
+    let osu_map = match osu_file_from_url(&osu_path).await {
+        Ok(map) => {
+            debug!("Osu file fetched, length: {} bytes", map.len());
+            map
+        }
+        Err(err) => {
+            warn!("Failed to fetch osu file from URL {}: {:?}. Skipping this beatmap.", osu_path, err);
+            return Ok(()); // Skip this beatmap and continue processing others
+        }
+    };
 
-    let parsed_beatmap = RmBeatmap::from_str(&osu_map).unwrap();
-    debug!("Beatmap parsed successfully");
+    let parsed_beatmap = match RmBeatmap::from_str(&osu_map) {
+        Ok(map) => {
+            debug!("Beatmap parsed successfully");
+            map
+        }
+        Err(err) => {
+            warn!("Failed to parse beatmap from osu file: {:?}. Skipping this beatmap.", err);
+            return Ok(()); // Skip this beatmap and continue processing others
+        }
+    };
 
     let rates = vec![
         0.7, 0.8, 0.9, 1.0, 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8, 1.9, 2.0,
@@ -101,7 +117,13 @@ pub(crate) async fn process_beatmap(
             total_time: beatmap.seconds_total as f64,
             bpm: beatmap.bpm as f32,
         };
-        let rates: Rates = rates_from_skillset_scores(&mut rates_maker).await.unwrap();
+        let rates: Rates = match rates_from_skillset_scores(&mut rates_maker).await {
+            Ok(rates) => rates,
+            Err(err) => {
+                warn!("Failed to create rates for beatmap {}: {:?}. Skipping this rate.", beatmap.map_id, err);
+                continue; // Skip this rate and continue with the next one
+            }
+        };
         debug!(
             "Rates created for {}: centirate={}, hash={}",
             rate_key,
@@ -119,7 +141,13 @@ pub(crate) async fn process_beatmap(
             let _ = FileManager::create_beatmap_directory_structure(osu_id);
 
             // Recréer la chaîne .osu à partir du beatmap (après rate)
-            let osu_string = rates_maker.osu_map.encode_to_string().unwrap();
+            let osu_string = match rates_maker.osu_map.encode_to_string() {
+                Ok(s) => s,
+                Err(err) => {
+                    warn!("Failed to encode beatmap to string: {:?}. Skipping compression.", err);
+                    continue; // Skip compression for this rate
+                }
+            };
             if let Ok(result) = CompressionManager::compress_string(&osu_string) {
                 let _ = FileManager::save_compressed_file(osu_id, hash, &result.compressed_data);
                 debug!(
