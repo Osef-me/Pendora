@@ -1,12 +1,15 @@
 use anyhow::Result;
 use rosu_v2::prelude::*;
+use std::sync::Arc;
+
+#[derive(Clone)]
 pub struct OsuApiService {
-    client: Osu,
+    client: Arc<Osu>,
 }
 
 impl OsuApiService {
     pub async fn new(client_id: String, client_secret: String) -> Result<Self> {
-        let client = Osu::new(client_id.parse::<u64>().unwrap(), client_secret).await?;
+        let client = Arc::new(Osu::new(client_id.parse::<u64>().unwrap(), client_secret).await?);
 
         Ok(Self { client })
     }

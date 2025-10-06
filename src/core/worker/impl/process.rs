@@ -14,6 +14,7 @@ use rosu_v2::prelude::BeatmapExtended;
 use std::collections::HashMap;
 use std::str::FromStr;
 use std::time::Instant;
+use rayon::prelude::*;
 use tracing::{debug, info, warn};
 /// Structure unifiée contenant à la fois le beatmap et les scores de skillset
 #[derive(Debug, Clone)]
@@ -21,6 +22,51 @@ struct BeatmapWithScores {
     beatmap: RmBeatmap,
     skillset_scores: Ssr,
 }
+
+/// Traite un seul rate de manière indépendante pour faciliter le débogage (version synchrone pour Rayon)
+fn process_single_rate_sync(
+    rate_key: String,
+    beatmap_with_scores: BeatmapWithScores,
+    beatmap: &BeatmapExtended,
+    beatmap_row: &Beatmap,
+) -> Rates {
+    let mut rates_maker = RatesMaker {
+        skillset_scores: beatmap_with_scores.skillset_scores,
+        osu_map: beatmap_with_scores.beatmap,
+        rate: rate_key.clone(),
+        drain_time: beatmap.seconds_drain as f64,
+        total_time: beatmap.seconds_total as f64,
+        bpm: beatmap.bpm as f32,
+    };
+
+    // Créer un runtime Tokio local pour cette opération
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .unwrap();
+
+    let rates = runtime.block_on(rates_from_skillset_scores(&mut rates_maker))
+        .unwrap();
+
+    // Sauvegarder le beatmap compressé en Brotli, nommé par le hash calculé
+    if let (Some(osu_id), Some(hash)) = (beatmap_row.osu_id, &rates.osu_hash) {
+        // S'assurer que l'arborescence existe
+        let _ = FileManager::create_beatmap_directory_structure(osu_id);
+
+        // Recréer la chaîne .osu à partir du beatmap (après rate)
+        let osu_string = rates_maker.osu_map.encode_to_string().unwrap();
+        if let Ok(result) = CompressionManager::compress_string(&osu_string) {
+            let _ = FileManager::save_compressed_file(osu_id, hash, &result.compressed_data);
+        } else {
+            warn!("Failed to compress beatmap for rate: {}", rate_key);
+        }
+    } else {
+        warn!("Missing osu_id or hash for rate: {}", rate_key);
+    }
+
+    rates
+}
+
 
 pub fn apply_rate(rate: f64, map: &mut RmBeatmap) {
     BeatmapProcessor::apply_rate(rate, map);
@@ -35,27 +81,11 @@ pub(crate) async fn process_beatmap(
     debug!("Starting beatmap processing for osu_id: {}", beatmap.map_id);
 
     debug!("Fetching osu file from URL: {}", osu_path);
-    let osu_map = match osu_file_from_url(&osu_path).await {
-        Ok(map) => {
-            debug!("Osu file fetched, length: {} bytes", map.len());
-            map
-        }
-        Err(err) => {
-            warn!("Failed to fetch osu file from URL {}: {:?}. Skipping this beatmap.", osu_path, err);
-            return Ok(()); // Skip this beatmap and continue processing others
-        }
-    };
+    let osu_map = osu_file_from_url(&osu_path).await.unwrap();
+    debug!("Osu file fetched, length: {} bytes", osu_map.len());
 
-    let parsed_beatmap = match RmBeatmap::from_str(&osu_map) {
-        Ok(map) => {
-            debug!("Beatmap parsed successfully");
-            map
-        }
-        Err(err) => {
-            warn!("Failed to parse beatmap from osu file: {:?}. Skipping this beatmap.", err);
-            return Ok(()); // Skip this beatmap and continue processing others
-        }
-    };
+    let parsed_beatmap = RmBeatmap::from_str(&osu_map).unwrap();
+    debug!("Beatmap parsed successfully");
 
     let rates = vec![
         0.7, 0.8, 0.9, 1.0, 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8, 1.9, 2.0,
@@ -102,65 +132,31 @@ pub(crate) async fn process_beatmap(
         }
     }
 
-    // Traiter chaque entrée unifiée
-    debug!(
-        "Processing {} beatmaps with scores",
-        beatmaps_with_scores.len()
-    );
-    for (rate_key, beatmap_with_scores) in beatmaps_with_scores {
-        debug!("Creating rates for rate: {}", rate_key);
-        let mut rates_maker = RatesMaker {
-            skillset_scores: beatmap_with_scores.skillset_scores,
-            osu_map: beatmap_with_scores.beatmap,
-            rate: rate_key.clone(),
-            drain_time: beatmap.seconds_drain as f64,
-            total_time: beatmap.seconds_total as f64,
-            bpm: beatmap.bpm as f32,
-        };
-        let rates: Rates = match rates_from_skillset_scores(&mut rates_maker).await {
-            Ok(rates) => rates,
-            Err(err) => {
-                warn!("Failed to create rates for beatmap {}: {:?}. Skipping this rate.", beatmap.map_id, err);
-                continue; // Skip this rate and continue with the next one
-            }
-        };
-        debug!(
-            "Rates created for {}: centirate={}, hash={}",
-            rate_key,
-            rates.centirate,
-            rates.osu_hash.as_deref().unwrap_or("none")
-        );
+    // Traiter chaque entrée unifiée en parallèle avec Rayon
 
-        // Sauvegarder le beatmap compressé en Brotli, nommé par le hash calculé
-        if let (Some(osu_id), Some(hash)) = (beatmap_row.osu_id, &rates.osu_hash) {
-            debug!(
-                "Saving compressed beatmap for osu_id={}, hash={}",
-                osu_id, hash
-            );
-            // S'assurer que l'arborescence existe
-            let _ = FileManager::create_beatmap_directory_structure(osu_id);
+    // Préparer les données pour le traitement parallèle
+    let processing_data: Vec<(String, BeatmapWithScores)> = beatmaps_with_scores
+        .into_iter()
+        .collect();
 
-            // Recréer la chaîne .osu à partir du beatmap (après rate)
-            let osu_string = match rates_maker.osu_map.encode_to_string() {
-                Ok(s) => s,
-                Err(err) => {
-                    warn!("Failed to encode beatmap to string: {:?}. Skipping compression.", err);
-                    continue; // Skip compression for this rate
-                }
-            };
-            if let Ok(result) = CompressionManager::compress_string(&osu_string) {
-                let _ = FileManager::save_compressed_file(osu_id, hash, &result.compressed_data);
-                debug!(
-                    "Compressed file saved: {} bytes",
-                    result.compressed_data.len()
-                );
-            } else {
-                warn!("Failed to compress beatmap for rate: {}", rate_key);
-            }
-        } else {
-            warn!("Missing osu_id or hash for rate: {}", rate_key);
-        }
+    // Traiter en parallèle et collecter les résultats
+    let results: Vec<Rates> = processing_data
+        .par_iter()
+        .map(|(rate_key, beatmap_with_scores)| {
+            // Note: Cette fonction doit être synchrone pour Rayon
+            // Nous devrons peut-être adapter process_single_rate pour être synchrone
+            // ou utiliser une version synchrone pour les calculs CPU-bound
+            process_single_rate_sync(
+                rate_key.clone(),
+                beatmap_with_scores.clone(),
+                beatmap,
+                beatmap_row,
+            )
+        })
+        .collect();
 
+    // Ajouter tous les résultats au beatmap_row
+    for rates in results {
         beatmap_row.rates.push(rates);
     }
 

@@ -32,7 +32,6 @@ pub async fn osu_file_from_url(path_url: &str) -> Result<String, Box<dyn std::er
 
 pub async fn is_allowed_beatmap(mode: GameMode, cs: f32) -> bool {
     // TODO: delete those and accept STD and 7K
-    println!("mode: {:?}, cs: {}", mode, cs);
     if mode != GameMode::Mania {
         return false;
     }

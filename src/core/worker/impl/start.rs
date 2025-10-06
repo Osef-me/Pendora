@@ -7,41 +7,84 @@ use crate::errors::BeatmapWorkerError;
 use crate::utils::{build_file_path, is_allowed_beatmap};
 use anyhow::Result;
 use db::models::beatmaps::pending_beatmap::PendingBeatmapRow;
+use minacalc_rs::{ThreadSafeCalcPool, GLOBAL_CALC_POOL};
+use rosu_v2::prelude::{BeatmapExtended, BeatmapsetExtended};
 
 impl BeatmapWorker {
     pub async fn start(&self) -> Result<(), BeatmapWorkerError> {
         tracing::info!("Beatmap worker started");
 
-        let calc = minacalc_rs::Calc::new()
+        // Initialiser le pool global de calculateurs avec 4 instances
+        let calc_pool = &GLOBAL_CALC_POOL;
+        calc_pool.pre_populate(4)
             .map_err(|e| BeatmapWorkerError::MinacalcError(e.to_string()))?;
 
+        tracing::info!("Initialized minacalc pool with 4 calculators");
+
+        // Nombre de workers parallèles (limité par le pool de calculateurs)
+        let worker_count = 4;
+        let mut handles = Vec::new();
+
+        // Lancer les workers en parallèle
+        for worker_id in 0..worker_count {
+            let worker_config = self.config.clone();
+            let worker_osu_api = self.osu_api_service.clone();
+
+            let handle = tokio::spawn(async move {
+                let worker = BeatmapWorker {
+                    config: worker_config,
+                    osu_api_service: worker_osu_api,
+                };
+                worker.start_worker(worker_id).await;
+            });
+            handles.push(handle);
+        }
+
+        // Attendre que tous les workers terminent
+        for handle in handles {
+            handle.await.map_err(|e| {
+                BeatmapWorkerError::ProcessingFailed(format!("Worker task failed: {}", e))
+            })?;
+        }
+
+        Ok(())
+    }
+
+    /// Fonction dédiée pour chaque worker individuel
+    async fn start_worker(&self, worker_id: usize) {
+        tracing::info!("Worker {} started", worker_id);
+
         loop {
-            tracing::debug!("Checking for pending beatmaps...");
+            tracing::debug!("Worker {}: Checking for pending beatmaps...", worker_id);
             let pool = self.config.database.get_pool();
             let pending_beatmaps = PendingBeatmapRow::last_pending_beatmap(&pool)
-                .await
-                .map_err(|e| BeatmapWorkerError::DatabaseError(e.to_string()))?;
+                .await;
 
-            let Some(pending_beatmap) = pending_beatmaps else {
-                tracing::debug!("No pending beatmaps found, sleeping for 10 seconds");
-                std::thread::sleep(std::time::Duration::from_secs(10));
-                continue;
+            let pending_beatmap = match pending_beatmaps {
+                Ok(Some(beatmap)) => beatmap,
+                Ok(None) => {
+                    tracing::debug!("Worker {}: No pending beatmaps found, sleeping for 10 seconds", worker_id);
+                    tokio::time::sleep(tokio::time::Duration::from_secs(10)).await;
+                    continue;
+                }
+                Err(e) => {
+                    tracing::error!("Worker {}: Database error: {}", worker_id, e);
+                    tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
+                    continue;
+                }
             };
 
-            tracing::info!(
-                "Processing pending beatmap: id={}, hash={}",
-                pending_beatmap.id,
-                pending_beatmap.osu_hash
-            );
             if let Err(e) = PendingBeatmapRow::delete_by_id(&pool, pending_beatmap.id).await {
-                tracing::error!(error = %e, "failed to delete pending beatmap");
+                tracing::error!("Worker {}: Failed to delete pending beatmap: {}", worker_id, e);
                 continue;
             }
 
             tracing::debug!(
-                "Fetching beatmap from osu! API for hash: {}",
+                "Worker {}: Fetching beatmap from osu! API for hash: {}",
+                worker_id,
                 pending_beatmap.osu_hash
             );
+
             let beatmap = match self
                 .osu_api_service
                 .beatmap_by_checksum(pending_beatmap.osu_hash.clone())
@@ -49,68 +92,84 @@ impl BeatmapWorker {
             {
                 Ok(b) => b,
                 Err(e) => {
-                    tracing::error!(error = %e, "failed to fetch beatmap by checksum");
+                    tracing::error!("Worker {}: Failed to fetch beatmap by checksum: {}", worker_id, e);
                     continue;
                 }
             };
 
             tracing::debug!(
-                "Beatmap fetched: osu_id={}, mode={}, cs={}",
+                "Worker {}: Beatmap fetched: osu_id={}, mode={}, cs={}",
+                worker_id,
                 beatmap.map_id,
                 beatmap.mode,
                 beatmap.cs
             );
+
             if !is_allowed_beatmap(beatmap.mode, beatmap.cs).await {
                 tracing::warn!(
-                    "Beatmap not allowed: mode={}, cs={}",
+                    "Worker {}: Beatmap not allowed: mode={}, cs={}",
+                    worker_id,
                     beatmap.mode,
                     beatmap.cs
                 );
                 continue;
             }
 
-            let Some(beatmapset) = beatmap.mapset.clone() else {
-                tracing::warn!("beatmap has no mapset, skipping");
+            let Some(beatmapset) = &beatmap.mapset else {
+                tracing::warn!("Worker {}: beatmap has no mapset, skipping", worker_id);
                 continue;
             };
+
             tracing::debug!(
-                "Beatmapset: id={}, artist={}, title={}",
+                "Worker {}: Beatmapset: id={}, artist={}, title={}",
+                worker_id,
                 beatmapset.mapset_id,
                 beatmapset.artist,
                 beatmapset.title
             );
 
-            let mut beatmapset_row = beatmapset_from_beatmapset_extended(&beatmapset);
-            let mut beatmap_row = beatmap_from_beatmap_extended(&beatmap);
-            let Some(osu_id) = beatmap_row.osu_id else {
-                tracing::warn!("beatmap has no osu_id, skipping");
-                continue;
-            };
-            let osu_path = build_file_path(osu_id as u32);
-
-            tracing::info!(
-                "Processing beatmap: osu_id={}, difficulty={}",
-                beatmap_row.osu_id.unwrap(),
-                beatmap_row.difficulty
-            );
-            if let Err(e) = process_beatmap(&beatmap, &calc, osu_path, &mut beatmap_row).await {
-                tracing::warn!(error = %e, "failed to process beatmap (unsupported mode or other issue), skipping");
+            if let Err(e) = self.process_single_beatmap(&beatmap, beatmapset, worker_id).await {
+                tracing::error!("Worker {}: Failed to process beatmap: {}", worker_id, e);
                 continue;
             }
 
-            beatmapset_row.beatmaps.push(beatmap_row);
             tracing::info!(
-                "Inserting beatmapset into database: osu_id={}",
-                beatmapset_row.osu_id.unwrap()
-            );
-            if let Err(e) = insert_full_beatmapset(&self, &beatmapset_row).await {
-                tracing::error!(error = %e, "failed to insert beatmapset");
-                continue;
-            }
-            tracing::info!(
-                "Successfully processed and inserted beatmapset: osu_id={}",
-                beatmapset_row.osu_id.unwrap()
+                "Worker {}: Successfully processed and inserted beatmapset: osu_id={}",
+                worker_id,
+                beatmapset.mapset_id
             );
         }
+    }
+
+    /// Traite une seule beatmap avec son beatmapset
+    async fn process_single_beatmap(
+        &self,
+        beatmap: &BeatmapExtended,
+        beatmapset: &BeatmapsetExtended,
+        worker_id: usize,
+    ) -> Result<(), BeatmapWorkerError> {
+        let mut beatmapset_row = beatmapset_from_beatmapset_extended(beatmapset);
+        let mut beatmap_row = beatmap_from_beatmap_extended(beatmap);
+        let Some(osu_id) = beatmap_row.osu_id else {
+            return Err(BeatmapWorkerError::DatabaseError("beatmap has no osu_id".to_string()));
+        };
+        let osu_path = build_file_path(osu_id as u32);
+
+        // Obtenir un calculateur du pool global
+        let calc = ThreadSafeCalcPool::get_global_calc()
+            .map_err(|e| BeatmapWorkerError::MinacalcError(e.to_string()))?;
+
+        let result = process_beatmap(beatmap, &calc, osu_path, &mut beatmap_row).await;
+
+        // Toujours retourner le calculateur au pool, même en cas d'erreur
+        ThreadSafeCalcPool::return_global_calc(calc);
+
+        result?;
+
+        beatmapset_row.beatmaps.push(beatmap_row);
+
+        insert_full_beatmapset(self, &beatmapset_row).await?;
+
+        Ok(())
     }
 }
