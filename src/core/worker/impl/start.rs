@@ -7,45 +7,16 @@ use crate::errors::BeatmapWorkerError;
 use crate::utils::{build_file_path, is_allowed_beatmap};
 use anyhow::Result;
 use db::models::beatmaps::pending_beatmap::PendingBeatmapRow;
-use minacalc_rs::{ThreadSafeCalcPool, GLOBAL_CALC_POOL};
+use minacalc_rs::Calc;
 use rosu_v2::prelude::{BeatmapExtended, BeatmapsetExtended};
 
 impl BeatmapWorker {
     pub async fn start(&self) -> Result<(), BeatmapWorkerError> {
         tracing::info!("Beatmap worker started");
 
-        // Initialiser le pool global de calculateurs avec 4 instances
-        let calc_pool = &GLOBAL_CALC_POOL;
-        calc_pool.pre_populate(4)
-            .map_err(|e| BeatmapWorkerError::MinacalcError(e.to_string()))?;
 
-        tracing::info!("Initialized minacalc pool with 4 calculators");
-
-        // Nombre de workers parallèles (limité par le pool de calculateurs)
-        let worker_count = 4;
-        let mut handles = Vec::new();
-
-        // Lancer les workers en parallèle
-        for worker_id in 0..worker_count {
-            let worker_config = self.config.clone();
-            let worker_osu_api = self.osu_api_service.clone();
-
-            let handle = tokio::spawn(async move {
-                let worker = BeatmapWorker {
-                    config: worker_config,
-                    osu_api_service: worker_osu_api,
-                };
-                worker.start_worker(worker_id).await;
-            });
-            handles.push(handle);
-        }
-
-        // Attendre que tous les workers terminent
-        for handle in handles {
-            handle.await.map_err(|e| {
-                BeatmapWorkerError::ProcessingFailed(format!("Worker task failed: {}", e))
-            })?;
-        }
+        // Lancer un seul worker séquentiel
+        self.start_worker(0).await;
 
         Ok(())
     }
@@ -53,6 +24,9 @@ impl BeatmapWorker {
     /// Fonction dédiée pour chaque worker individuel
     async fn start_worker(&self, worker_id: usize) {
         tracing::info!("Worker {} started", worker_id);
+
+        // Créer une instance locale de calculateur
+        let calc = Calc::new();
 
         loop {
             tracing::debug!("Worker {}: Checking for pending beatmaps...", worker_id);
@@ -128,7 +102,7 @@ impl BeatmapWorker {
                 beatmapset.title
             );
 
-            if let Err(e) = self.process_single_beatmap(&beatmap, beatmapset, worker_id).await {
+            if let Err(e) = self.process_single_beatmap(&beatmap, beatmapset, worker_id, &calc).await {
                 tracing::error!("Worker {}: Failed to process beatmap: {}", worker_id, e);
                 continue;
             }
@@ -147,6 +121,7 @@ impl BeatmapWorker {
         beatmap: &BeatmapExtended,
         beatmapset: &BeatmapsetExtended,
         worker_id: usize,
+        calc: &Calc,
     ) -> Result<(), BeatmapWorkerError> {
         let mut beatmapset_row = beatmapset_from_beatmapset_extended(beatmapset);
         let mut beatmap_row = beatmap_from_beatmap_extended(beatmap);
@@ -155,14 +130,8 @@ impl BeatmapWorker {
         };
         let osu_path = build_file_path(osu_id as u32);
 
-        // Obtenir un calculateur du pool global
-        let calc = ThreadSafeCalcPool::get_global_calc()
-            .map_err(|e| BeatmapWorkerError::MinacalcError(e.to_string()))?;
-
-        let result = process_beatmap(beatmap, &calc, osu_path, &mut beatmap_row).await;
-
-        // Toujours retourner le calculateur au pool, même en cas d'erreur
-        ThreadSafeCalcPool::return_global_calc(calc);
+        // Utiliser le calculateur local passé en paramètre
+        let result = process_beatmap(beatmap, calc, osu_path, &mut beatmap_row).await;
 
         result?;
 
