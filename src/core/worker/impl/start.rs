@@ -8,6 +8,7 @@ use crate::utils::{build_file_path, is_allowed_beatmap};
 use anyhow::Result;
 use db::models::beatmaps::pending_beatmap::PendingBeatmapRow;
 use db::models::beatmaps::beatmap::BeatmapRow;
+use db::models::other::failed_query::FailedQueryRow;
 use minacalc_rs::Calc;
 use rosu_v2::prelude::{BeatmapExtended, BeatmapsetExtended};
 
@@ -53,9 +54,23 @@ impl BeatmapWorker {
                 tracing::error!("Worker {}: Failed to delete pending beatmap: {}", worker_id, e);
                 continue;
             }
+            let exists = BeatmapRow::exists_by_hash(&pool, &pending_beatmap.osu_hash).await.map_err(|e| {
+                tracing::error!("Worker {}: Failed to check if beatmap exists: {}", worker_id, e);
+                e
+            });
 
-            if BeatmapRow::find_by_hash(&pool, pending_beatmap.osu_hash.clone()).await.is_some() {
+            if exists.is_ok() && exists.unwrap() == true {
                 tracing::debug!("Worker {}: Beatmap already exists, skipping", worker_id);
+                continue;
+            }
+
+            let failed_exists = FailedQueryRow::exists_by_hash(&pool, &pending_beatmap.osu_hash).await.map_err(|e| {
+                tracing::error!("Worker {}: Failed to check if failed query exists: {}", worker_id, e);
+                e
+            });
+
+            if failed_exists.is_ok() && failed_exists.unwrap() == true {
+                tracing::debug!("Worker {}: Failed query already exists, skipping", worker_id);
                 continue;
             }
 
