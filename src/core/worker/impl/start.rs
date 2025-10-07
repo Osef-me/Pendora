@@ -26,7 +26,7 @@ impl BeatmapWorker {
         tracing::info!("Worker {} started", worker_id);
 
         // Créer une instance locale de calculateur
-        let calc = Calc::new();
+        let calc = Calc::new().unwrap();
 
         loop {
             tracing::debug!("Worker {}: Checking for pending beatmaps...", worker_id);
