@@ -7,6 +7,7 @@ use crate::errors::BeatmapWorkerError;
 use crate::utils::{build_file_path, is_allowed_beatmap};
 use anyhow::Result;
 use db::models::beatmaps::pending_beatmap::PendingBeatmapRow;
+use db::models::beatmaps::beatmap::BeatmapRow;
 use minacalc_rs::Calc;
 use rosu_v2::prelude::{BeatmapExtended, BeatmapsetExtended};
 
@@ -50,6 +51,11 @@ impl BeatmapWorker {
 
             if let Err(e) = PendingBeatmapRow::delete_by_id(&pool, pending_beatmap.id).await {
                 tracing::error!("Worker {}: Failed to delete pending beatmap: {}", worker_id, e);
+                continue;
+            }
+
+            if BeatmapRow::find_by_hash(&pool, pending_beatmap.osu_hash.clone()).await.is_some() {
+                tracing::debug!("Worker {}: Beatmap already exists, skipping", worker_id);
                 continue;
             }
 
