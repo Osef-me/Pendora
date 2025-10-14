@@ -2,23 +2,21 @@ use crate::core::rating::make_rates::RatesMaker;
 use crate::core::rating::proportion::Proportion;
 use crate::utils::calculator::get_star_rating;
 use crate::utils::calculator::get_sunnyxxy_rating;
-use crate::utils::rate::hash::hash_md5;
 use anyhow::Result;
 use dto::models::rate::{ManiaRating, ModeRating, Rates, Rating};
 use tracing::debug;
 
-pub async fn rates_from_skillset_scores(make_rates: &mut RatesMaker) -> Result<Rates> {
-    debug!(
-        "Creating rates for rate: {} ({}x)",
-        make_rates.rate,
-        make_rates.rate.parse::<f64>().unwrap()
-    );
+pub async fn rates_from_skillset_scores(
+    make_rates: &mut RatesMaker,
+    hash: String,
+) -> Result<Rates> {
+
 
     let rate_data = calculate_rate_data(make_rates);
     let proportions = calculate_proportions(make_rates);
-    let osu_map = encode_beatmap_to_string(make_rates);
-    let osu_hash = generate_beatmap_hash(&osu_map);
-    let ratings = create_all_ratings(make_rates, &proportions, &osu_map);
+    let osu_hash = hash;
+
+    let ratings = create_all_ratings(make_rates, &proportions, &make_rates.osu_map);
 
     let rates = Rates {
         id: None,
@@ -46,15 +44,15 @@ struct RateData {
 }
 
 fn calculate_rate_data(make_rates: &RatesMaker) -> RateData {
-    let rate = make_rates.rate.parse::<f64>().unwrap();
-    let centirate = rate * 100.0;
+    let centirate = make_rates.centirate as f64;
+    let rate = centirate / 100.0;
     let proportion_rate = 100.0 / centirate;
     let drain_time = make_rates.drain_time * proportion_rate;
     let total_time = make_rates.total_time * proportion_rate;
     let bpm = make_rates.bpm as f64 * rate;
 
     RateData {
-        centirate: centirate as i32,
+        centirate: make_rates.centirate,
         drain_time: drain_time as i32,
         total_time: total_time as i32,
         bpm: bpm as f32,
@@ -82,15 +80,9 @@ fn calculate_proportions(make_rates: &RatesMaker) -> Proportion {
     }
 }
 
-fn encode_beatmap_to_string(make_rates: &RatesMaker) -> String {
-    make_rates.osu_map.clone().encode_to_string().unwrap()
-}
 
-fn generate_beatmap_hash(osu_map: &str) -> String {
-    let hash = hash_md5(osu_map).unwrap();
-    debug!("Generated osu hash: {}", hash);
-    hash
-}
+
+// removed unused generate_beatmap_hash
 
 fn create_all_ratings(
     make_rates: &RatesMaker,
@@ -98,8 +90,8 @@ fn create_all_ratings(
     osu_map: &str,
 ) -> Vec<Rating> {
     let etterna_rating = create_etterna_rating(make_rates);
-    let osu_rating = create_osu_rating(osu_map, proportions);
-    let sunny_rating = create_sunny_rating(osu_map, proportions);
+    let osu_rating = create_osu_rating(osu_map, proportions, make_rates.centirate as i64);
+    let sunny_rating = create_sunny_rating(osu_map, proportions, make_rates.centirate as i64);
 
     vec![etterna_rating, sunny_rating, osu_rating]
 }
@@ -123,18 +115,16 @@ fn create_etterna_rating(make_rates: &RatesMaker) -> Rating {
     }
 }
 
-fn create_osu_rating(osu_map: &str, proportions: &Proportion) -> Rating {
+fn create_osu_rating(osu_map: &str, proportions: &Proportion, centirate: i64) -> Rating {
     debug!("Calculating star rating...");
-    let stars = get_star_rating(osu_map);
-    debug!("Star rating calculated: {:.2}", stars);
+    let stars = get_star_rating(osu_map, centirate);
 
     rating_new("osu".to_string(), stars, proportions.clone())
 }
 
-fn create_sunny_rating(osu_map: &str, proportions: &Proportion) -> Rating {
+fn create_sunny_rating(osu_map: &str, proportions: &Proportion, centirate: i64) -> Rating {
     debug!("Calculating sunnyxxy rating...");
-    let sunny_rating_value = get_sunnyxxy_rating(osu_map);
-    debug!("Sunnyxxy rating calculated: {:.2}", sunny_rating_value);
+    let sunny_rating_value = get_sunnyxxy_rating(osu_map, centirate);
 
     rating_new(
         "sunnyxxy".to_string(),

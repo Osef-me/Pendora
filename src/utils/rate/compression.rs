@@ -42,8 +42,9 @@ impl CompressionManager {
         let original_size = data.len();
         let mut compressed_data = Vec::new();
         let params = BrotliEncoderParams::default();
+        let mut input = data;
 
-        brotli::enc::BrotliCompress(&mut data.clone(), &mut compressed_data, &params)
+        brotli::enc::BrotliCompress(&mut input, &mut compressed_data, &params)
             .map_err(|e| format!("Brotli compression failed: {}", e))?;
 
         let compressed_size = compressed_data.len();
@@ -61,38 +62,4 @@ impl CompressionManager {
     }
 }
 
-/// Statistiques de compression pour plusieurs fichiers
-#[derive(Debug, Default)]
-pub struct CompressionStats {
-    pub total_original_size: usize,
-    pub total_compressed_size: usize,
-    pub file_count: usize,
-}
-
-impl CompressionStats {
-    /// Ajoute les statistiques d'un fichier
-    pub fn add_file(&mut self, result: &CompressionResult) {
-        self.total_original_size += result.original_size;
-        self.total_compressed_size += result.compressed_size;
-        self.file_count += 1;
-    }
-
-    /// Calcule le ratio de compression global
-    pub fn total_compression_ratio(&self) -> f64 {
-        if self.total_original_size > 0 {
-            (self.total_compressed_size as f64 / self.total_original_size as f64) * 100.0
-        } else {
-            0.0
-        }
-    }
-
-    /// Calcule le total d'octets économisés
-    pub fn total_saved_bytes(&self) -> usize {
-        self.total_original_size - self.total_compressed_size
-    }
-
-    /// Calcule l'espace économisé en KB
-    pub fn saved_kb(&self) -> f64 {
-        self.total_saved_bytes() as f64 / 1024.0
-    }
-}
+// removed unused CompressionStats

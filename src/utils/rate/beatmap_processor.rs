@@ -5,15 +5,26 @@ use rosu_map::Beatmap;
 pub struct BeatmapProcessor;
 
 impl BeatmapProcessor {
-    /// Applique un rate sur un beatmap
-    pub fn apply_rate(rate: f64, map: &mut Beatmap) {
-        // Modifie le nom du fichier audio
-        map.audio_file = map
-            .audio_file
-            .replace(".mp3", format!("_r{}.ogg", rate).as_str());
+    /// Applique un centirate sur un beatmap (100 == 1.0x)
+    pub fn apply_rate(centirate: i64, map: &Beatmap) -> Beatmap {
+        // Cloner pour travailler sur une copie
+        let mut map = map.clone();
 
-        let time_multiplier: f64 = 1.0 / rate;
+        let audio = map.audio_file.clone();
+        let formatted_rate = format!("{:.1}", centirate as f64 / 100.0);
+        let new_audio = match audio.rfind('.') {
+            Some(dot_idx) => {
+                let (base, ext) = audio.split_at(dot_idx);
+                format!("{}_r{}{}", base, formatted_rate, ext)
+            }
+            None => format!("{}_r{}", audio, formatted_rate),
+        };
+        map.audio_file = new_audio;
 
+        // Utiliser directement centirate pour éviter les conversions inutiles
+        let time_multiplier: f64 = 100.0 / centirate as f64;
+
+        
         // Applique le multiplicateur de temps à tous les hit objects
         for hit_object in &mut map.hit_objects {
             Self::adjust_hit_object_timing(hit_object, time_multiplier);
@@ -40,8 +51,10 @@ impl BeatmapProcessor {
             point.time *= time_multiplier;
         }
 
-        // Ajoute le rate à la version
-        map.version.push_str(&format!(" {}", rate));
+        // Ajoute le rate à la version sous forme normalisée (ex: " 1.2x")
+        map.version.push_str(&format!(" {}x", formatted_rate));
+
+        return map;
     }
 
     /// Ajuste le timing d'un hit object selon le multiplicateur
@@ -53,8 +66,9 @@ impl BeatmapProcessor {
         }
     }
 
-    /// Applique un rate directement sur un beatmap (modifie le beatmap en place)
-    pub fn apply_rate_to_beatmap(rate: f64, map: &mut Beatmap) {
-        Self::apply_rate(rate, map);
+    /// Applique un centirate directement sur un beatmap (modifie le beatmap en place)
+    pub fn apply_rate_to_beatmap(centirate: i64, map: &mut Beatmap) {
+        let new_map = Self::apply_rate(centirate, map);
+        *map = new_map;
     }
 }

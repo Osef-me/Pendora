@@ -12,7 +12,7 @@ path = "src/main.rs"
 
 [dependencies]
 dotenvy = "0.15.7"
-minacalc-rs = { version = "0.2.2", features = ["osu", "hashmap", "thread"] }
+minacalc-rs = { version = "0.2.2", features = ["osu", "hashmap"] }
 rosu-map = "0.2.1"
 rosu-pp = "3.1.0"
 rosu-v2 = "0.11.0"
@@ -30,6 +30,5 @@ serde_json = "1.0"
 serde = { version = "1.0", features = ["derive"] }
 reqwest = "0.12.23"
 brotli = "8.0.2"
-rayon = "1.11.0"
 md5 = "0.8.0"
-ssrrr = "0.1.0"
+ssrrr = "0.2.1"

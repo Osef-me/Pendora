@@ -21,7 +21,8 @@ pub fn rank_status_to_string(status: &RankStatus) -> String {
 }
 
 pub fn build_file_path(beatmap_id: u32) -> String {
-    format!("https://osu.ppy.sh/osu/{}", beatmap_id)
+    let b = format!("https://osu.ppy.sh/osu/{}", beatmap_id);
+    return b;
 }
 
 pub async fn osu_file_from_url(path_url: &str) -> Result<String, Box<dyn std::error::Error>> {

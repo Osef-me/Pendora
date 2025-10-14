@@ -7,9 +7,7 @@ use db::models::beatmaps::beatmapset::BeatmapsetRow;
 use db::models::beatmaps::rates::RatesRow;
 use db::models::rating::beatmap_mania_rating::BeatmapManiaRatingRow;
 use db::models::rating::beatmap_rating::BeatmapRatingRow;
-use dto::models::beatmaps::full::types::{
-    Beatmapset as DtoBeatmapset,
-};
+use dto::models::beatmaps::full::types::Beatmapset as DtoBeatmapset;
 use dto::models::rate::ModeRating;
 
 /// Insert a full beatmapset hierarchy into the database using database-lib only.

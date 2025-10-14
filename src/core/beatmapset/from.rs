@@ -1,6 +1,6 @@
+use chrono::DateTime;
 use dto::models::beatmaps::full::types::Beatmapset;
 use rosu_v2::prelude::BeatmapsetExtended;
-use chrono::DateTime;
 
 pub fn beatmapset_from_beatmapset_extended(beatmapset: &BeatmapsetExtended) -> Beatmapset {
     Beatmapset {
@@ -31,11 +31,10 @@ pub fn beatmapset_from_beatmapset_extended(beatmapset: &BeatmapsetExtended) -> B
         preview_url: Some(beatmapset.preview_url.clone()),
         osu_file_url: Some(beatmapset.source.to_string()),
         beatmaps: Vec::new(),
-        osu_status_changed_at: Some(DateTime::from_timestamp(
-            beatmapset.last_updated.unix_timestamp(),
-            0
-        )
-        .unwrap_or_default()
-        .naive_utc()),
+        osu_status_changed_at: Some(
+            DateTime::from_timestamp(beatmapset.last_updated.unix_timestamp(), 0)
+                .unwrap_or_default()
+                .naive_utc(),
+        ),
     }
 }
